@@ -1,0 +1,8 @@
+name: RegionFastReload
+main: me.botdebug.RegionFastReload
+version: 1.0.0
+commands:
+  regionfastreload:
+    description: cleanup the specific region
+    usage: /regionfastreload
+    permission: regionfastreload.cleanup
