@@ -1,70 +1,60 @@
 package me.botdebug;
 
 import net.minecraft.server.v1_12_R1.BlockPosition;
+import net.minecraft.server.v1_12_R1.Blocks;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.craftbukkit.v1_12_R1.CraftWorld;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.List;
 
 public class RegionFastReload extends JavaPlugin {
     public static Plugin instance;
+    public static BlockPosition posA;
+    public static BlockPosition posB;
+
 
     public RegionFastReload() {
         instance = this;
+        posA = stringToBlockPos(this.getConfig().getString("select-a"));
+        posB = stringToBlockPos(this.getConfig().getString("select-b"));
     }
 
-    public static Location stringToLocation(String stringLocation) {
-        if (stringLocation == null) {
+    public static BlockPosition stringToBlockPos(String stringPos) {
+        if (stringPos == null) {
             return null;
         }
-        String[] locStringSplit = stringLocation.split(";");
-        World world = Bukkit.getWorld(locStringSplit[0]);
-        if (world == null) {
-            return null;
-        }
+        String[] posStringSplit = stringPos.split(";");
         try {
-            return new Location(world, Double.parseDouble(locStringSplit[1]), Double.parseDouble(locStringSplit[2]), Double.parseDouble(locStringSplit[3]));
+            return new BlockPosition(Double.parseDouble(posStringSplit[1]), Double.parseDouble(posStringSplit[2]), Double.parseDouble(posStringSplit[3]));
         } catch (NumberFormatException e) {
             return null;
         }
     }
 
-    public static List<Location> getAllLocation(Location a, Location b) {
-        int maxX = Math.max(a.getBlockX(), b.getBlockX());
-        int maxy = Math.max(a.getBlockY(), b.getBlockY());
-        int maxZ = Math.max(a.getBlockZ(), b.getBlockZ());
-        int minX = Math.min(a.getBlockX(), b.getBlockX());
-        int minY = Math.min(a.getBlockY(), b.getBlockY());
-        int minZ = Math.min(a.getBlockZ(), b.getBlockZ());
-        List<Location> list = new ArrayList<>();
+    public static void resetRegion(net.minecraft.server.v1_12_R1.World nmsWorld, BlockPosition a, BlockPosition b) {
+        int maxX = Math.max(a.getX(), b.getX());
+        int maxy = Math.max(a.getY(), b.getY());
+        int maxZ = Math.max(a.getZ(), b.getZ());
+        int minX = Math.min(a.getX(), b.getX());
+        int minY = Math.min(a.getY(), b.getY());
+        int minZ = Math.min(a.getZ(), b.getZ());
         for (int t1 = minX; t1 <= maxX; ++t1) {
             for (int t2 = minY; t2 <= maxy; ++t2) {
                 for (int t3 = minZ; t3 <= maxZ; ++t3) {
-                    Location bb = new Location(a.getWorld(), t1, t2, t3);
-                    list.add(bb);
+                    BlockPosition bp = new BlockPosition(t1, t2, t3);
+                    if (nmsWorld.getType(bp) != Blocks.BEDROCK.getBlockData()) {
+                        removeBlockInNativeWorld(nmsWorld, bp);
+                    }
                 }
             }
         }
-        return list;
     }
 
-    public static List<Block> getAllBlock(Location a, Location b) {
-        List<Block> c = new ArrayList<>();
-        getAllLocation(a, b).forEach(s -> c.add(s.getBlock()));
-        return c;
-    }
-
-    public static void removeBlockInNativeWorld(net.minecraft.server.v1_12_R1.World nmsWorld, int x, int y, int z) {
-        nmsWorld.setTypeAndData(new BlockPosition(x, y, z), net.minecraft.server.v1_12_R1.Blocks.AIR.getBlockData(), 2);
+    public static void removeBlockInNativeWorld(net.minecraft.server.v1_12_R1.World nmsWorld, BlockPosition bp) {
+        nmsWorld.setTypeAndData(bp, net.minecraft.server.v1_12_R1.Blocks.AIR.getBlockData(), 2);
     }
 
     @Override
@@ -89,11 +79,9 @@ public class RegionFastReload extends JavaPlugin {
                 }
                 if (curTime.getHour() != timerHour || curTime.getMinute() != timerMinute) continue;
                 this.getServer().getConsoleSender().sendMessage("§a[§e" + this.getName() + "§a]§r starts cleaning...");
-                List<Block> blocks = getAllBlock(stringToLocation(this.getConfig().getString("select-a")), stringToLocation(this.getConfig().getString("select-b")));
-                net.minecraft.server.v1_12_R1.World nmsWorld = ((CraftWorld)(Bukkit.getWorld(RegionFastReload.instance.getConfig().getString("select-a").split(";")[0]))).getHandle();
-                blocks.stream()
-                        .filter(block -> block.getType() != Material.BEDROCK)
-                        .forEach(block -> RegionFastReload.removeBlockInNativeWorld(nmsWorld, block.getX(), block.getY(), block.getZ()));
+                net.minecraft.server.v1_12_R1.World nmsWorld = ((CraftWorld) (Bukkit.getWorld(this.getConfig().getString("select-a").split(";")[0]))).getHandle();
+                resetRegion(nmsWorld, posA, posB);
+                this.getServer().getConsoleSender().sendMessage("§a[§e" + this.getName() + "§a]§r finished cleaning...");
             }
         }, 0L, 1200L);
         this.getServer().getConsoleSender().sendMessage("§a[§e" + this.getName() + "§a]§r enabled!");
